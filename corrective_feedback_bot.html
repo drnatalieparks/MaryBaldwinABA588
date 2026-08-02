@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Corrective Feedback Bot — ABA 588</title>
+<style>
+:root{--navy:#1B4F72;--green:#1A6B4A;--amber:#BA7517;--red:#A32D2D;--purple:#534AB7;--bg:#F8F9FA;--card:#FFFFFF;--border:#DEE2E6;--txt:#1C2833;--muted:#6C757D}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;padding:0}
+.app{max-width:700px;margin:0 auto;padding:1.5rem 1rem 3rem}
+.header{margin-bottom:1.5rem}
+.header h1{font-size:19px;font-weight:600;color:var(--navy);margin-bottom:4px}
+.header p{font-size:13px;color:var(--muted);line-height:1.5}
+.progress-wrap{margin-bottom:1.25rem}
+.progress-label{font-size:11px;color:var(--muted);margin-bottom:5px;display:flex;justify-content:space-between}
+.progress-row{display:flex;gap:5px}
+.prog-dot{flex:1;height:8px;border-radius:4px;background:var(--border);transition:background .3s}
+.prog-dot.done{background:var(--green)}
+.prog-dot.active{background:var(--navy)}
+.prog-dot.ec{background:var(--purple)}
+.prog-dot.ec.done{background:var(--purple);opacity:.7}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-bottom:1rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.scenario-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.badge{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:500}
+.badge-attempt{background:#E3F2FD;color:#1565C0}
+.badge-ec{background:#EDE7F6;color:var(--purple);font-weight:600}
+.badge-req{background:#E8F5E9;color:var(--green)}
+.scenario-text{font-size:13.5px;line-height:1.75;color:var(--txt)}
+.record-zone{display:flex;flex-direction:column;align-items:center;gap:10px;padding:1.5rem;background:var(--bg);border-radius:10px;margin-bottom:1rem}
+.record-btn{width:68px;height:68px;border-radius:50%;border:2.5px solid var(--navy);background:var(--card);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:26px;transition:all .2s}
+.record-btn:hover{background:#EBF5FB}
+.record-btn.recording{background:#FDEDEC;border-color:var(--red);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(163,45,45,.3)}50%{box-shadow:0 0 0 10px rgba(163,45,45,0)}}
+.record-status{font-size:13px;color:var(--muted);text-align:center}
+.record-status.active{color:var(--red);font-weight:500}
+.transcript-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.875rem;font-size:13px;line-height:1.7;min-height:60px;margin-bottom:1rem;white-space:pre-wrap;color:var(--txt)}
+.transcript-box em{color:var(--muted);font-style:italic}
+.btn{width:100%;padding:11px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .2s;margin-bottom:.5rem}
+.btn:last-child{margin-bottom:0}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--navy);color:#fff}
+.btn-primary:hover:not(:disabled){opacity:.88}
+.btn-success{background:var(--green);color:#fff}
+.btn-success:hover{opacity:.88}
+.btn-amber{background:var(--amber);color:#fff}
+.btn-amber:hover{opacity:.88}
+.btn-purple{background:var(--purple);color:#fff}
+.btn-purple:hover{opacity:.88}
+.btn-ghost{background:var(--bg);color:var(--txt);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--border)}
+.rubric-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1rem}
+.rubric-header{padding:.875rem 1.25rem;background:var(--bg);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.rubric-header span{font-size:13px;font-weight:600}
+.total-score{font-size:20px;font-weight:700}
+.total-score.pass{color:var(--green)}
+.total-score.fail{color:var(--red)}
+.rubric-row{padding:.75rem 1.25rem;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 44px;gap:10px;align-items:start}
+.rubric-row:last-child{border-bottom:none}
+.dim-name{font-size:13px;font-weight:600;margin-bottom:2px}
+.dim-fb{font-size:12px;color:var(--muted);line-height:1.5}
+.score-badge{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;justify-self:center}
+.s1,.s2{background:#FDEDEC;color:var(--red)}
+.s3{background:#FEF9E7;color:var(--amber)}
+.s4{background:#EAFAF1;color:var(--green)}
+.ai-feedback{background:#EBF5FB;border:1px solid #AED6F1;border-radius:8px;padding:.875rem;font-size:13px;line-height:1.7;color:#1A5276;margin-bottom:1rem}
+.banner{border-radius:10px;padding:1.25rem;text-align:center;margin-bottom:1rem}
+.banner h2{font-size:17px;font-weight:600;margin-bottom:5px}
+.banner p{font-size:13px;line-height:1.5}
+.banner-pass{background:#EAFAF1;border:1.5px solid #82E0AA}
+.banner-pass h2{color:var(--green)}
+.banner-pass p{color:#1E8449}
+.banner-fail{background:#FDEDEC;border:1.5px solid #F1948A}
+.banner-fail h2,.banner-fail p{color:var(--red)}
+.banner-ec{background:#EDE7F6;border:1.5px solid #B39DDB}
+.banner-ec h2{color:var(--purple)}
+.banner-ec p{color:#4A235A}
+.banner-mastery{background:#EAFAF1;border:2px solid var(--green)}
+.banner-mastery h2{color:var(--green)}
+.banner-mastery p{color:#1E8449}
+.ec-banner{background:#EDE7F6;border:1.5px solid #B39DDB;border-radius:10px;padding:1rem;margin-bottom:1rem;text-align:center}
+.ec-banner p{font-size:13px;color:#4A235A;line-height:1.5}
+.ec-banner strong{color:var(--purple)}
+.summary-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.summary-row:last-child{border-bottom:none}
+.pass-mark{color:var(--green);font-weight:600}
+.fail-mark{color:var(--red)}
+.ec-mark{color:var(--purple);font-weight:600}
+.divider{height:1px;background:var(--border);margin:1rem 0}
+.section-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem}
+.dots-anim::after{content:'';animation:dots 1.2s steps(3,end) infinite}
+@keyframes dots{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>Corrective Feedback Bot</h1>
+    <p>Read each scenario, then record your verbal corrective feedback as if speaking directly with your supervisee. You must pass 3 scenarios to meet the mastery criterion. Scenarios 4 and 5 are available for extra credit.</p>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span>Progress</span>
+      <span id="progressText">0 of 3 required passed</span>
+    </div>
+    <div class="progress-row" id="progressRow"></div>
+  </div>
+  <div id="appContent"></div>
+</div>
+
+<script>
+// ── EMBED API KEY HERE ────────────────────────────────────────────────────────
+const API_KEY = "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";
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SCENARIOS = [
+  {
+    id:1, required:true,
+    title:"Scenario 1 — Prompt dependency",
+    text:"Your behavior technician Jordan has been working with a 7-year-old client on independent task completion. During your observation today, you notice that Jordan provides a verbal prompt, 'what's next?', before the client has had any opportunity to initiate independently. The client now waits silently for Jordan's prompt before beginning each step, even on tasks they mastered independently two months ago. Jordan is clearly warm with the client and appears to enjoy the work. They do not seem aware that their prompting pattern is the source of the regression you are seeing in the data."
+  },
+  {
+    id:2, required:true,
+    title:"Scenario 2 — Data integrity",
+    text:"Your behavior technician Sam has been collecting trial-by-trial data on a mand training program for an 11-year-old client. You observe a session and do not see Sam actively collecting data. Only at the end of the session, when completing the session note, does Sam record any data. When the session is complete, you review what was written for mand training: 80% independent. You did not observe the entire session, but your data indicate the client's mands were only 40% independent. When you ask Sam about it, Sam explains that running the program and collecting data at the same time is too hard and that the estimates are accurate. The client is up for an insurance authorization review in three weeks, and you know the data as recorded are not accurate."
+  },
+  {
+    id:3, required:true,
+    title:"Scenario 3 — Family interaction",
+    text:"During a home visit, you observe your behavior technician Alex respond to a mother's questions about her child's program with brief, jargon-heavy, impatient answers and no eye contact. At one point Alex says 'that's in the parent handbook' before turning back to the session. The mother stops asking questions for the rest of the visit. You have noticed this pattern before. The family has not been following through on the home program."
+  },
+  {
+    id:4, required:false,
+    title:"Scenario 4 — Unauthorized physical intervention",
+    text:"Your client has a crisis protocol specifying a particular de-escalation sequence when elopement is imminent. During today's session, you observe your behavior technician Morgan physically block the client from reaching the door — a procedure not in the protocol and not approved. Morgan explains afterward that they 'had to do something' because the approved steps were 'taking too long.' Morgan is shaken and visibly upset."
+  },
+  {
+    id:5, required:false,
+    title:"Scenario 5 — Reinforcer delivery regardless of response",
+    text:"You are supervising Riley during a discrete trial program targeting receptive identification. Over 20 minutes you observe Riley delivering a token after every trial — correct responses, prompted responses, and errors alike. Riley tells you that the client becomes very distressed when they don't receive a token and that keeping the session positive is their priority. The client's data has shown zero progress for four consecutive weeks."
+  }
+];
+
+const RUBRIC = [
+  {key:"empathy", label:"Empathy and perspective-taking", desc:"Acknowledges supervisee's experience, effort, or context"},
+  {key:"specificity", label:"Behavioral specificity", desc:"Names the exact behavior observed with sufficient detail"},
+  {key:"effect", label:"Statement of effect", desc:"Explains the impact on the client, program, or supervisee"},
+  {key:"correction", label:"Actionable correction", desc:"Provides a specific, concrete alternative behavior"},
+  {key:"tone", label:"Overall tone", desc:"Warm, direct, professional throughout"}
+];
+
+const MASTERY = 3; // required scenarios to pass
+const REQUIRED_COUNT = 3;
+
+let state = {
+  apiKey: API_KEY,
+  currentIdx: 0,
+  attempts: Array(5).fill(0),
+  passed: Array(5).fill(false),
+  log: [],
+  transcript: '',
+  recording: false,
+  mediaRecorder: null,
+  audioChunks: [],
+  processing: false
+};
+
+function requiredPassed(){ return state.passed.slice(0,3).filter(Boolean).length; }
+function extraPassed(){ return state.passed.slice(3).filter(Boolean).length; }
+function masteryReached(){ return requiredPassed() >= MASTERY; }
+
+function renderProgress(){
+  const row = document.getElementById('progressRow');
+  row.innerHTML = '';
+  SCENARIOS.forEach((sc,i)=>{
+    const dot = document.createElement('div');
+    let cls = 'prog-dot';
+    if(!sc.required) cls += ' ec';
+    if(state.passed[i]) cls += ' done';
+    else if(i === state.currentIdx) cls += ' active';
+    dot.className = cls;
+    dot.title = sc.title;
+    row.appendChild(dot);
+  });
+  const rp = requiredPassed();
+  document.getElementById('progressText').textContent =
+    `${rp} of ${REQUIRED_COUNT} required passed${extraPassed()>0?' · '+extraPassed()+' extra credit':''}`;
+}
+
+function renderScenario(){
+  if(state.currentIdx >= SCENARIOS.length){ renderFinal(); return; }
+  const sc = SCENARIOS[state.currentIdx];
+  const isEC = !sc.required;
+  const att = state.attempts[state.currentIdx];
+  let html = `<div class="card">
+    <div class="scenario-label">
+      ${sc.title}
+      <span class="badge badge-attempt">Attempt ${att+1}</span>
+      ${isEC ? '<span class="badge badge-ec">⭐ Extra Credit</span>' : '<span class="badge badge-req">Required</span>'}
+    </div>
+    <p class="scenario-text">${sc.text}</p>
+  </div>`;
+  if(isEC && !masteryReached()){
+    html += `<div class="banner banner-fail"><h2>Required scenarios not yet complete</h2><p>Complete and pass Scenarios 1, 2, and 3 before attempting extra credit scenarios.</p></div>`;
+  } else {
+    html += `<div class="record-zone">
+      <button class="record-btn" id="recordBtn" onclick="toggleRecord()" aria-label="Start recording">🎙</button>
+      <span class="record-status" id="recordStatus">Press to record your feedback</span>
+    </div>
+    <div class="transcript-box" id="transcriptBox"><em>Your recorded response will appear here after you stop recording...</em></div>
+    <button class="btn btn-primary" id="submitBtn" disabled onclick="submitFeedback()">Evaluate my feedback</button>`;
+  }
+  if(isEC && !masteryReached()){
+    // no extra button — just show the block
+  } else if(state.currentIdx > 0 || masteryReached()){
+    if(isEC){
+      html += `<button class="btn btn-ghost" onclick="skipEC()">Skip this extra credit scenario</button>`;
+    }
+  }
+  document.getElementById('appContent').innerHTML = html;
+}
+
+async function toggleRecord(){
+  if(state.recording){ stopRecording(); } else { await startRecording(); }
+}
+
+async function startRecording(){
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    state.audioChunks = [];
+    state.mediaRecorder = new MediaRecorder(stream);
+    state.mediaRecorder.ondataavailable = e=>{ if(e.data.size>0) state.audioChunks.push(e.data); };
+    state.mediaRecorder.onstop = handleStop;
+    state.mediaRecorder.start();
+    state.recording = true;
+    const btn = document.getElementById('recordBtn');
+    btn.classList.add('recording'); btn.innerHTML='⏹'; btn.setAttribute('aria-label','Stop recording');
+    const st = document.getElementById('recordStatus');
+    st.textContent='Recording — press to stop'; st.classList.add('active');
+  }catch(e){ alert('Microphone access required. Please allow microphone access in your browser and try again.'); }
+}
+
+function stopRecording(){
+  if(state.mediaRecorder && state.mediaRecorder.state!=='inactive'){
+    state.mediaRecorder.stop();
+    state.mediaRecorder.stream.getTracks().forEach(t=>t.stop());
+  }
+  state.recording = false;
+  const btn = document.getElementById('recordBtn');
+  btn.classList.remove('recording'); btn.innerHTML='🎙'; btn.setAttribute('aria-label','Start recording');
+  const st = document.getElementById('recordStatus');
+  st.classList.remove('active');
+  st.innerHTML='Transcribing<span class="dots-anim"></span>';
+}
+
+async function handleStop(){
+  const blob = new Blob(state.audioChunks,{type:'audio/webm'});
+  const b64 = await blobToBase64(blob);
+  try{
+    const t = await transcribeAudio(b64);
+    state.transcript = t;
+    document.getElementById('transcriptBox').textContent = t;
+    document.getElementById('recordStatus').textContent = 'Recording complete — review or re-record';
+    document.getElementById('submitBtn').disabled = false;
+  }catch(e){
+    document.getElementById('transcriptBox').innerHTML='<em>Transcription failed. Please try again.</em>';
+    document.getElementById('recordStatus').textContent='Error — please try recording again';
+  }
+}
+
+function blobToBase64(blob){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=rej;
+    r.readAsDataURL(blob);
+  });
+}
+
+async function transcribeAudio(b64){
+  const res = await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':state.apiKey,'anthropic-version':'2023-06-01'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:[
+      {type:'text',text:'Transcribe this audio recording exactly as spoken. Return only the transcription, no other text.'},
+      {type:'document',source:{type:'base64',media_type:'audio/webm',data:b64}}
+    ]}]})
+  });
+  const data = await res.json();
+  if(data.error) throw new Error(data.error.message);
+  return data.content[0].text;
+}
+
+async function submitFeedback(){
+  if(state.processing) return;
+  state.processing = true;
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('submitBtn').textContent='Scoring your feedback…';
+
+  const sc = SCENARIOS[state.currentIdx];
+  const prompt=`You are an expert ABA supervisor trainer evaluating a BCBA student's corrective feedback delivery. Score each of the five dimensions on a 1-4 scale.
+
+SCENARIO:
+${sc.text}
+
+STUDENT'S VERBAL FEEDBACK (transcribed):
+"${state.transcript}"
+
+DIMENSIONS (score 1-4):
+
+1. Empathy and perspective-taking:
+4=Explicitly acknowledges supervisee's experience, effort, or context; genuine care communicated. 3=Acknowledges perspective generally; not perfunctory. 2=Minimal/formulaic acknowledgment. 1=No acknowledgment of the supervisee as a person.
+
+2. Behavioral specificity:
+4=Names exact behavior with sufficient detail that the supervisee knows precisely what is being addressed. 3=Behavior named clearly with most context. 2=Vague; supervisee may not know what is meant. 1=Labels person/character rather than specific behavior.
+
+3. Statement of effect:
+4=Clearly explains impact on client, family, program, or supervisee's development; meaningful and non-punitive. 3=Explains impact in general terms. 2=Impact implied but not stated. 1=No connection between behavior and effect.
+
+4. Actionable correction:
+4=Specific concrete alternative behavior; offer to model or practice made. 3=Clear correction with enough specificity to act on. 2=General correction only. 1=No correction; only evaluative.
+
+5. Overall tone:
+4=Warm, direct, professional throughout; neither punitive nor conflict-avoidant. 3=Mostly professional; minor inconsistencies. 2=Too harsh, too apologetic, or inconsistent. 1=Punitive, dismissive, or so indirect feedback is lost.
+
+Respond ONLY with valid JSON:
+{"scores":{"empathy":N,"specificity":N,"effect":N,"correction":N,"tone":N},"feedback":{"empathy":"specific feedback","specificity":"specific feedback","effect":"specific feedback","correction":"specific feedback","tone":"specific feedback"},"overall":"2-3 sentence honest specific overall comment","passed":true_or_false}
+passed=true only if ALL five scores are 3 or above.`;
+
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':state.apiKey,'anthropic-version':'2023-06-01'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:prompt}]})
+    });
+    const data = await res.json();
+    const text = data.content[0].text.replace(/```json|```/g,'').trim();
+    const result = JSON.parse(text);
+    result.transcript = state.transcript;
+    result.scenarioId = sc.id;
+    result.scenarioTitle = sc.title;
+    result.attempt = state.attempts[state.currentIdx]+1;
+    result.required = sc.required;
+    state.attempts[state.currentIdx]++;
+    if(result.passed) state.passed[state.currentIdx] = true;
+    state.log.push(result);
+    renderResult(result);
+    renderProgress();
+  }catch(e){
+    document.getElementById('submitBtn').disabled=false;
+    document.getElementById('submitBtn').textContent='Evaluate my feedback';
+    alert('Error scoring your response. Please check your connection and try again.');
+  }
+  state.processing=false;
+}
+
+function renderResult(result){
+  const total = Object.values(result.scores).reduce((a,b)=>a+b,0);
+  const sc = SCENARIOS[state.currentIdx];
+  const isEC = !sc.required;
+  let html = `<div class="card">
+    <div class="scenario-label">${sc.title}${isEC?'<span class="badge badge-ec">⭐ Extra Credit</span>':''}</div>
+    <p class="scenario-text">${sc.text}</p>
+  </div>
+  <div class="card">
+    <div class="section-label">Your response (transcribed)</div>
+    <p style="font-size:13px;line-height:1.7;font-style:italic">"${result.transcript}"</p>
+  </div>
+  <div class="rubric-card">
+    <div class="rubric-header">
+      <span>Rubric scores</span>
+      <span class="total-score ${result.passed?'pass':'fail'}">${total}/20 — ${result.passed?'Passed':'Needs work'}</span>
+    </div>`;
+  RUBRIC.forEach(dim=>{
+    const s = result.scores[dim.key];
+    html += `<div class="rubric-row">
+      <div><div class="dim-name">${dim.label}</div><div class="dim-fb">${result.feedback[dim.key]}</div></div>
+      <div class="score-badge s${s}">${s}</div>
+    </div>`;
+  });
+  html += `</div><div class="ai-feedback">${result.overall}</div>`;
+
+  const rp = requiredPassed();
+  const allRequiredDone = state.passed.slice(0,3).every(Boolean);
+
+  if(result.passed){
+    if(!isEC && rp >= MASTERY && !state.passed.slice(3).some(Boolean)){
+      html += `<div class="banner banner-mastery"><h2>✓ Required mastery achieved!</h2><p>You have passed all 3 required scenarios. Download your transcript now, or continue to Scenarios 4 and 5 for extra credit (10 points each).</p></div>`;
+      html += `<button class="btn btn-success" onclick="downloadTranscript()">Download transcript and submit to Canvas</button>`;
+      html += `<button class="btn btn-purple" onclick="nextScenario()">Continue to Scenario 4 (extra credit)</button>`;
+    } else if(!isEC && rp < MASTERY){
+      html += `<div class="banner banner-pass"><h2>Scenario passed!</h2><p>${MASTERY-rp} more required scenario${MASTERY-rp>1?'s':''} needed for mastery.</p></div>`;
+      html += `<button class="btn btn-success" onclick="nextScenario()">Continue to next scenario</button>`;
+    } else if(isEC){
+      const ep = extraPassed();
+      if(ep >= 2 || state.currentIdx >= 4){
+        html += `<div class="banner banner-ec"><h2>⭐ Extra credit complete!</h2><p>You have completed both extra credit scenarios. Download your full transcript and submit to Canvas.</p></div>`;
+        html += `<button class="btn btn-success" onclick="downloadTranscript()">Download full transcript and submit to Canvas</button>`;
+      } else {
+        html += `<div class="banner banner-ec"><h2>⭐ Extra credit scenario passed!</h2><p>One more extra credit scenario available for 10 additional points.</p></div>`;
+        html += `<button class="btn btn-purple" onclick="nextScenario()">Continue to Scenario 5 (extra credit)</button>`;
+        html += `<button class="btn btn-success" onclick="downloadTranscript()">Download transcript and submit now</button>`;
+      }
+    }
+  } else {
+    html += `<div class="banner banner-fail"><h2>Needs work</h2><p>One or more dimensions scored below 3. Review the feedback above and try again.</p></div>`;
+    html += `<button class="btn btn-amber" onclick="retryScenario()">Try this scenario again</button>`;
+  }
+
+  if(result.passed && !isEC && rp >= MASTERY){
+    // already has download button above
+  } else if(result.passed){
+    // continue buttons above
+  } else {
+    // retry button above
+  }
+
+  document.getElementById('appContent').innerHTML = html;
+}
+
+function nextScenario(){
+  state.currentIdx++;
+  state.transcript='';
+  renderProgress();
+  if(state.currentIdx>=SCENARIOS.length){ renderFinal(); } else { renderScenario(); }
+}
+
+function retryScenario(){ state.transcript=''; renderScenario(); }
+
+function skipEC(){
+  state.currentIdx++;
+  state.transcript='';
+  renderProgress();
+  if(state.currentIdx>=SCENARIOS.length){ renderFinal(); } else { renderScenario(); }
+}
+
+function renderFinal(){
+  const rp = requiredPassed();
+  const ep = extraPassed();
+  let html = `<div class="banner ${rp>=MASTERY?'banner-mastery':'banner-fail'}">
+    <h2>${rp>=MASTERY?'Assignment complete':'Required scenarios not all passed'}</h2>
+    <p>${rp>=MASTERY?'Download your transcript and submit to Canvas.':'Contact your instructor if you need guidance.'}</p>
+  </div>
+  <div class="card">
+    <div class="section-label">Score summary</div>`;
+  state.log.forEach(l=>{
+    const total=Object.values(l.scores).reduce((a,b)=>a+b,0);
+    html+=`<div class="summary-row">
+      <span>${l.scenarioTitle}${!l.required?' ⭐':''} — Attempt ${l.attempt}</span>
+      <span class="${l.passed?(l.required?'pass-mark':'ec-mark'):'fail-mark'}">${total}/20 ${l.passed?'✓':''}</span>
+    </div>`;
+  });
+  html+=`</div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:.75rem">Required: ${rp}/3 passed. Extra credit: ${ep}/2 passed.</p>
+  <button class="btn btn-success" onclick="downloadTranscript()">Download full transcript and submit to Canvas</button>`;
+  document.getElementById('appContent').innerHTML=html;
+}
+
+function downloadTranscript(){
+  let text=`CORRECTIVE FEEDBACK BOT — TRANSCRIPT\nABA 588: Early Practice & Experiential Skills — Fall 2026\nGenerated: ${new Date().toLocaleString()}\n\nMastery criterion: all 5 dimensions ≥ 3 on 3 of the 5 scenarios\nRequired scenarios passed: ${requiredPassed()}/3\nExtra credit scenarios passed: ${extraPassed()}/2\n\n${'='.repeat(60)}\n\n`;
+  state.log.forEach(l=>{
+    const total=Object.values(l.scores).reduce((a,b)=>a+b,0);
+    text+=`${l.scenarioTitle}${!l.required?' [EXTRA CREDIT]':' [REQUIRED]'}\nAttempt: ${l.attempt} | Result: ${l.passed?'PASSED':'DID NOT PASS'} | Total: ${total}/20\n\nScores:\n`;
+    RUBRIC.forEach(d=>{ text+=`  ${d.label}: ${l.scores[d.key]}/4\n`; });
+    text+=`\nTranscript:\n"${l.transcript}"\n\nFeedback:\n`;
+    RUBRIC.forEach(d=>{ text+=`  ${d.label}: ${l.feedback[d.key]}\n`; });
+    text+=`\nOverall: ${l.overall}\n\n${'-'.repeat(40)}\n\n`;
+  });
+  const blob=new Blob([text],{type:'text/plain'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='Corrective_Feedback_Bot_Transcript.txt';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// Init
+renderProgress();
+renderScenario();
+</script>
+</body>
+</html>
